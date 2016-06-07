@@ -1,0 +1,16 @@
+[package]
+name = "sixier"
+version = "0.1.0"
+authors = ["Miranda Kastemaa <miranda@foldplop.com>"]
+
+[lib]
+name = "sixier"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sixier-bin"
+path = "src/main.rs"
+
+[dependencies]
+dsp-chain = "0.12.*"
+portaudio = "0.6.*"
