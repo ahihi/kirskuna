@@ -12,5 +12,5 @@ name = "sixier-bin"
 path = "src/main.rs"
 
 [dependencies]
-dsp-chain = "0.12.*"
+dsp-chain = "0.13.*"
 portaudio = "0.6.*"

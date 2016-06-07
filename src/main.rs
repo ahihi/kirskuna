@@ -3,13 +3,14 @@ extern crate portaudio;
 
 extern crate sixier;
 
-use dsp::{sample, Graph, Node, Settings};
+use dsp::{slice, Graph, Node};
+use dsp::sample::ToFrameSliceMut;
 use portaudio as pa;
 
+use sixier::base::{Output, CHANNELS};
 use sixier::node::{DspNode};
 use sixier::sine::{Sine};
 
-const CHANNELS: i32 = 2;
 const FRAMES: u32 = 64;
 const SAMPLE_HZ: f64 = 44_100.0;
 
@@ -29,10 +30,10 @@ fn run() -> Result<(), pa::Error> {
     let mut elapsed: f64 = 0.0;
     let mut prev_time = None;
 
-    let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, time, .. }| {
-        sample::buffer::equilibrium(buffer);
-        let settings = Settings::new(SAMPLE_HZ as u32, frames as u16, CHANNELS as u16);
-        graph.audio_requested(buffer, settings);
+    let callback = move |pa::OutputStreamCallbackArgs { buffer, time, .. }| {
+        let buffer: &mut [[Output; CHANNELS]] = buffer.to_frame_slice_mut().unwrap();
+        slice::equilibrium(buffer);
+        graph.audio_requested(buffer, SAMPLE_HZ);
 
         let last_time = prev_time.unwrap_or(time.current);
         let dt = time.current - last_time;
@@ -55,7 +56,8 @@ fn run() -> Result<(), pa::Error> {
     };
 
     let pa = try!(pa::PortAudio::new());
-    let settings = try!(pa.default_output_stream_settings(CHANNELS, SAMPLE_HZ, FRAMES));
+    let settings = try!(pa.default_output_stream_settings::<Output>(CHANNELS as i32, SAMPLE_HZ, FRAMES));
+    
     let mut stream = try!(pa.open_non_blocking_stream(settings, callback));
     try!(stream.start());
 

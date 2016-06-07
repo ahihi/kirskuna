@@ -1,6 +1,6 @@
-use dsp::{Node, Settings};
+use dsp::{Node};
 
-use base::{Output};
+use base::{Output, CHANNELS};
 use sine;
 
 #[derive(Debug)]
@@ -12,11 +12,11 @@ pub enum DspNode {
 impl DspNode {
 }
 
-impl Node<Output> for DspNode {
-    fn audio_requested(&mut self, buffer: &mut [Output], settings: Settings) {
+impl Node<[Output; CHANNELS]> for DspNode {
+    fn audio_requested(&mut self, buffer: &mut [[Output; CHANNELS]], sample_hz: f64) {
         match *self {
             DspNode::Blank => (),
-            DspNode::Sine(ref mut node) => node.audio_requested(buffer, settings)
+            DspNode::Sine(ref mut node) => node.audio_requested(buffer, sample_hz)
         }        
     }
 }
