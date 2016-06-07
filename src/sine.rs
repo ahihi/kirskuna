@@ -1,7 +1,7 @@
 use dsp::{Frame, Node, slice};
 //use dsp::slice;
 
-use base::{Amplitude, Frequency, Output, Phase, CHANNELS};
+use base::{Amplitude, Frequency, Output, Phase, CHANNELS, TAU};
 use math;
 
 #[derive(Debug)]
@@ -17,7 +17,7 @@ impl Node<[Output; CHANNELS]> for Sine {
             let wave: Amplitude = math::sine(self.phase);
             let sample = self.amplitude * wave;
             
-            self.phase += self.frequency / sample_hz as Frequency;
+            self.phase = (self.phase + self.frequency * TAU / sample_hz as Frequency) % TAU;
 
             Frame::from_fn(|_| sample)
         });

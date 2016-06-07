@@ -8,6 +8,7 @@ use dsp::sample::ToFrameSliceMut;
 use portaudio as pa;
 
 use sixier::base::{Output, CHANNELS};
+use sixier::delay::{Delay};
 use sixier::node::{DspNode};
 use sixier::sine::{Sine};
 
@@ -23,7 +24,15 @@ fn run() -> Result<(), pa::Error> {
 
     let master = graph.add_node(DspNode::Blank);
     
-    graph.add_input(DspNode::Sine(Sine { frequency: 440.0, phase: 0.0, amplitude: 0.5 }), master);
+    let (_, delay) = graph.add_input(
+        DspNode::Delay(Delay::new(SAMPLE_HZ as usize)),
+        master
+    );
+    
+    let (_, _sine) = graph.add_input(
+        DspNode::Sine(Sine { frequency: 440.0, phase: 0.0, amplitude: 0.5 }),
+        delay
+    );
 
     graph.set_master(Some(master));
 
