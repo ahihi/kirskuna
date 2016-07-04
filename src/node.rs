@@ -1,16 +1,20 @@
 use dsp::{Node};
 
 use base::{Output, CHANNELS};
+use clip_cubic;
 use delay;
 use input;
 use sine;
+
+// TODO: DRY
 
 #[derive(Debug)]
 pub enum DspNode {
     Blank,
     Sine(sine::Sine),
     Input(input::Input),
-    Delay(delay::Delay)
+    Delay(delay::Delay),
+    ClipCubic(clip_cubic::ClipCubic)
 }
 
 impl Node<[Output; CHANNELS]> for DspNode {
@@ -19,7 +23,8 @@ impl Node<[Output; CHANNELS]> for DspNode {
             DspNode::Blank => (),
             DspNode::Sine(ref mut node) => node.audio_requested(buffer, sample_hz),
             DspNode::Input(ref mut node) => node.audio_requested(buffer, sample_hz),
-            DspNode::Delay(ref mut node) => node.audio_requested(buffer, sample_hz)
+            DspNode::Delay(ref mut node) => node.audio_requested(buffer, sample_hz),
+            DspNode::ClipCubic(ref mut node) => node.audio_requested(buffer, sample_hz)
         }        
     }
     
@@ -29,6 +34,7 @@ impl Node<[Output; CHANNELS]> for DspNode {
             DspNode::Sine(ref node) => node.dry(),
             DspNode::Input(ref node) => node.dry(),
             DspNode::Delay(ref node) => node.dry(),
+            DspNode::ClipCubic(ref node) => node.dry()
         }
     }
     
@@ -38,6 +44,7 @@ impl Node<[Output; CHANNELS]> for DspNode {
             DspNode::Sine(ref node) => node.wet(),
             DspNode::Input(ref node) => node.wet(),
             DspNode::Delay(ref node) => node.wet(),
+            DspNode::ClipCubic(ref node) => node.wet(),
         }
     }
 }

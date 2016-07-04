@@ -8,6 +8,7 @@ use dsp::sample::ToFrameSliceMut;
 use portaudio as pa;
 
 use kirskuna::base::{Output, CHANNELS};
+use kirskuna::clip_cubic::{ClipCubic};
 use kirskuna::delay::{Delay};
 use kirskuna::input::{Input};
 use kirskuna::node::{DspNode};
@@ -31,8 +32,13 @@ fn run() -> Result<(), pa::Error> {
     
     let mut inputs: Vec<NodeIndex> = Vec::new();
     
-    let (_, delay) = graph.add_input(
+    /*let (_, delay) = graph.add_input(
         DspNode::Delay(Delay::new(SAMPLE_HZ as usize)),
+        master
+    );*/
+    
+    let (_, clip_cubic) = graph.add_input(
+        DspNode::ClipCubic(ClipCubic::new(8.0, 0.1, 1.0, 1.0)),
         master
     );
     
@@ -43,7 +49,7 @@ fn run() -> Result<(), pa::Error> {
     
     let (_, input) = graph.add_input(
         DspNode::Input(Input::new(FRAMES as usize)),
-        delay
+        clip_cubic
     );
     inputs.push(input);
 
