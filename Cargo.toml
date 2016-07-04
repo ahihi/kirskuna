@@ -1,14 +1,14 @@
 [package]
-name = "sixier"
+name = "kirskuna"
 version = "0.1.0"
 authors = ["Miranda Kastemaa <miranda@foldplop.com>"]
 
 [lib]
-name = "sixier"
+name = "kirskuna"
 path = "src/lib.rs"
 
 [[bin]]
-name = "sixier-bin"
+name = "kirskuna-bin"
 path = "src/main.rs"
 
 [dependencies]
