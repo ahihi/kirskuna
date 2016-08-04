@@ -1,4 +1,3 @@
-#![feature(unboxed_closures)]
 extern crate dsp;
 extern crate getopts;
 extern crate portaudio;
