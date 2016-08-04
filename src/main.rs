@@ -15,7 +15,7 @@ use portaudio as pa;
 
 use kirskuna::base::{Output};
 use kirskuna::clip_cubic::{ClipCubic};
-use kirskuna::fm::{FmSynth, Operator};
+use kirskuna::fm::{AdEnvelope, FmSynth, Operator};
 use kirskuna::delay::{Delay};
 use kirskuna::input::{Input};
 use kirskuna::node::{DspNode};
@@ -144,16 +144,21 @@ fn run(opts: &RunOptions) -> Result<(), pa::Error> {
     );
     inputs.push(input);*/
 
+    let mut fm = FmSynth {
+        carrier: Operator::new(110.0, 0.5, AdEnvelope::new(128.0, 1.0)),
+        modulator: Operator::new(6.0 * 110.0, 1000.0, AdEnvelope::new(4.0, 1.5))
+    };
+    fm.trigger();
+    
     let (_, fm_synth) = graph.add_input(
-        DspNode::FmSynth(FmSynth {
-            carrier: Operator::new(220.0, 0.5),
-            modulator: Operator::new(8.0 * 220.0, 1000.0)
-        }),
+        DspNode::FmSynth(fm),
         master
     );
 
     graph.set_master(Some(master));
 
+    let mut seq_step: usize = 0;
+    let seq_len: usize = 44100;
     let mut elapsed: f64 = 0.0;
     let mut prev_time = None;
 
@@ -168,6 +173,14 @@ fn run(opts: &RunOptions) -> Result<(), pa::Error> {
         let out_buffer: &mut [[Output; 2]] = out_buffer.to_frame_slice_mut().unwrap();
         slice::equilibrium(out_buffer);
         graph.audio_requested(out_buffer, SAMPLE_HZ);
+
+        let d_seq = out_buffer.len();
+        if seq_len - seq_step <= d_seq {
+            if let Some(&mut DspNode::FmSynth(ref mut synth)) = graph.node_mut(fm_synth) {
+                synth.trigger();                
+            }
+        }
+        seq_step = (seq_step + d_seq) % seq_len;
 
         let last_time = prev_time.unwrap_or(time.current);
         let dt = time.current - last_time;
