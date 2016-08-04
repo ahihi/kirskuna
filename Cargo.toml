@@ -12,5 +12,6 @@ name = "kirskuna-bin"
 path = "src/main.rs"
 
 [dependencies]
+getopts = "0.2"
 dsp-chain = "0.13.*"
 portaudio = "0.6.*"
