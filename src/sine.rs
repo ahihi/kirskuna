@@ -11,13 +11,23 @@ pub struct Sine {
     pub amplitude: Amplitude
 }
 
+impl Sine {
+    pub fn value(&self) -> f32 {
+        let sine: f32 = math::sine(self.phase);
+        self.amplitude * sine
+    }
+    
+    pub fn step(&mut self, sample_hz: f64) {
+        self.phase = math::step_phase(self.frequency * TAU / sample_hz, self.phase);
+    }
+}
+
 impl Node<[Output; CHANNELS]> for Sine {
     fn audio_requested(&mut self, buffer: &mut [[Output; CHANNELS]], sample_hz: f64) {
         slice::map_in_place(buffer, |_| {
-            let wave: Amplitude = math::sine(self.phase);
-            let sample = self.amplitude * wave;
+            let sample = self.value();
             
-            self.phase = (self.phase + self.frequency * TAU / sample_hz as Frequency) % TAU;
+            self.step(sample_hz);
 
             Frame::from_fn(|_| sample)
         });

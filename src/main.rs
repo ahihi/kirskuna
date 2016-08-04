@@ -15,6 +15,7 @@ use portaudio as pa;
 
 use kirskuna::base::{Output};
 use kirskuna::clip_cubic::{ClipCubic};
+use kirskuna::fm::{FmSynth, Operator};
 use kirskuna::delay::{Delay};
 use kirskuna::input::{Input};
 use kirskuna::node::{DspNode};
@@ -127,21 +128,29 @@ fn run(opts: &RunOptions) -> Result<(), pa::Error> {
         master
     );*/
     
-    let (_, clip_cubic) = graph.add_input(
+    /*let (_, clip_cubic) = graph.add_input(
         DspNode::ClipCubic(ClipCubic::new(8.0, 0.1, 1.0, 1.0)),
         master
-    );
+    );*/
     
     /*let (_, _sine) = graph.add_input(
         DspNode::Sine(Sine { frequency: 440.0, phase: 0.0, amplitude: 0.5 }),
         delay
     );*/
     
-    let (_, input) = graph.add_input(
+    /*let (_, input) = graph.add_input(
         DspNode::Input(Input::new(buf_size)),
         clip_cubic
     );
-    inputs.push(input);
+    inputs.push(input);*/
+
+    let (_, fm_synth) = graph.add_input(
+        DspNode::FmSynth(FmSynth {
+            carrier: Operator::new(220.0, 0.5),
+            modulator: Operator::new(8.0 * 220.0, 1000.0)
+        }),
+        master
+    );
 
     graph.set_master(Some(master));
 
