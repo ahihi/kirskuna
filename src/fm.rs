@@ -1,7 +1,9 @@
 use dsp::{Frame, Node, slice};
+use portmidi::{MidiEvent};
 
-use base::{CHANNELS, TAU};
+use base::{TAU};
 use math;
+use midi::{MidiDestination};
 use sine::Sine;
 
 #[derive(Debug)]
@@ -106,8 +108,8 @@ impl FmSynth {
     }
 }
 
-impl Node<[f32; CHANNELS]> for FmSynth {
-    fn audio_requested(&mut self, buffer: &mut [[f32; CHANNELS]], sample_hz: f64) {
+impl Node<[f32; 2]> for FmSynth {
+    fn audio_requested(&mut self, buffer: &mut [[f32; 2]], sample_hz: f64) {
         slice::map_in_place(buffer, |_| {
             let output = self.carrier.value();
             self.carrier.sine.frequency = self.carrier.base_frequency + self.modulator.value() as f64;
@@ -116,5 +118,11 @@ impl Node<[f32; CHANNELS]> for FmSynth {
             
             Frame::from_fn(|_| output)
         });
+    }
+}
+
+impl MidiDestination for FmSynth {
+    fn process_events(&mut self, events: &[MidiEvent]) {
+        println!("{:?}", events);
     }
 }

@@ -1,6 +1,7 @@
 use dsp::{Frame, Node, slice};
 
 use base::{Output, CHANNELS};
+use midi::{MidiDestination};
 
 #[derive(Debug)]
 pub struct ClipCubic {
@@ -41,3 +42,5 @@ impl Node<[Output; CHANNELS]> for ClipCubic {
         self.mix
     }
 }
+
+impl MidiDestination for ClipCubic {}

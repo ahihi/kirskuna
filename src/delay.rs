@@ -1,6 +1,7 @@
 use dsp::{Frame, Node, slice};
 
 use base::{Output, CHANNELS};
+use midi::{MidiDestination};
 
 #[derive(Debug)]
 pub struct Delay {
@@ -39,3 +40,5 @@ impl Node<[Output; CHANNELS]> for Delay {
         0.33
     }
 }
+
+impl MidiDestination for Delay {}

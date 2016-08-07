@@ -1,6 +1,7 @@
 use dsp::{Frame, Node, slice};
 
 use base::{Output, CHANNELS};
+use midi::{MidiDestination};
 
 #[derive(Debug)]
 pub struct Input {
@@ -29,3 +30,5 @@ impl Node<[Output; CHANNELS]> for Input {
         slice::zip_map_in_place(buffer, &self.buf, |_, src| src);
     }
 }
+
+impl MidiDestination for Input {}

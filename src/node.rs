@@ -1,9 +1,11 @@
 use dsp::{Node};
+use portmidi::{MidiEvent};
 
 use clip_cubic;
 use delay;
 use fm;
 use input;
+use midi::{MidiDestination};
 use sine;
 
 macro_rules! make_wrapper {
@@ -36,6 +38,15 @@ macro_rules! make_wrapper {
                 match *self {
                     $name::Blank => 1.0,
                     $( $name::$wrap(ref node) => node.wet() ),*
+                }
+            }
+        }
+        
+        impl MidiDestination for $name {
+            fn process_events(&mut self, events: &[MidiEvent]) {
+                match *self {
+                    $name::Blank => {},
+                    $( $name::$wrap(ref mut node) => node.process_events(events) ),*
                 }
             }
         }

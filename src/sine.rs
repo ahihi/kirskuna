@@ -3,6 +3,7 @@ use dsp::{Frame, Node, slice};
 
 use base::{Amplitude, Frequency, Output, Phase, CHANNELS, TAU};
 use math;
+use midi::{MidiDestination};
 
 #[derive(Debug)]
 pub struct Sine {
@@ -33,3 +34,5 @@ impl Node<[Output; CHANNELS]> for Sine {
         });
     }
 }
+
+impl MidiDestination for Sine {}

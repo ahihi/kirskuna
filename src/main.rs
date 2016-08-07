@@ -1,6 +1,7 @@
 extern crate dsp;
 extern crate getopts;
 extern crate portaudio;
+extern crate portmidi;
 
 extern crate kirskuna;
 
@@ -12,12 +13,14 @@ use dsp::{slice, Graph, Node, NodeIndex};
 use dsp::sample::ToFrameSliceMut;
 use getopts::Options;
 use portaudio as pa;
+use portmidi::{PortMidi, InputPort};
 
 use kirskuna::base::{Output};
 use kirskuna::clip_cubic::{ClipCubic};
 use kirskuna::fm::{AdEnvelope, FmSynth, Operator};
 use kirskuna::delay::{Delay};
 use kirskuna::input::{Input};
+use kirskuna::midi::{MidiDestination};
 use kirskuna::node::{DspNode};
 //use kirskuna::sine::{Sine};
 
@@ -25,6 +28,7 @@ const SAMPLE_HZ: f64 = 44_100.0;
 
 struct RunOptions {
     buf_size: usize,
+    midi_buf_size: usize,
     in_channels: usize,
     in_left: usize,
     in_right: usize,
@@ -55,8 +59,10 @@ fn get_command() -> Result<Command, Box<Error>> {
     
     opts.optflag("h", "help", "print help");
     opts.optopt("b", "buf-size", "buffer size", "FRAMES");
+    opts.optopt("B", "midi-buf-size", "MIDI buffer size", "EVENTS");
     opts.optopt("l", "in-left", "left input channel", "CHANNEL");
     opts.optopt("r", "in-right", "right input channel", "CHANNEL");
+    opts.optopt("m", "midi-in", "MIDI input device index", "DEVICE");
     opts.optopt("L", "out-left", "left output channel", "CHANNEL");
     opts.optopt("R", "out-right", "right output channel", "CHANNEL");
         
@@ -71,6 +77,11 @@ fn get_command() -> Result<Command, Box<Error>> {
     let buf_size = match m.opt_str("b") {
         Some(s) => try!(s.parse::<usize>()),
         None    => 64
+    };
+    
+    let midi_buf_size = match m.opt_str("B") {
+        Some(s) => try!(s.parse::<usize>()),
+        None    => 256
     };
     
     let in_left = match m.opt_str("l") {
@@ -99,6 +110,7 @@ fn get_command() -> Result<Command, Box<Error>> {
 
     Ok(Command::Run(RunOptions {
         buf_size: buf_size,
+        midi_buf_size: midi_buf_size,
         in_channels: in_channels,
         in_left: in_left,
         in_right: in_right,
@@ -108,8 +120,9 @@ fn get_command() -> Result<Command, Box<Error>> {
     }))
 }
 
-fn run(opts: &RunOptions) -> Result<(), pa::Error> {    
+fn run(opts: &RunOptions) -> Result<(), Box<Error>> {    
     let buf_size = opts.buf_size;
+    let midi_buf_size = opts.midi_buf_size;
     let in_left = opts.in_left;
     let in_right = opts.in_right;
     let in_channels = opts.in_channels;
@@ -157,12 +170,25 @@ fn run(opts: &RunOptions) -> Result<(), pa::Error> {
 
     graph.set_master(Some(master));
 
+    let midi = try!(PortMidi::new());
+    let midi_in = try!(midi.default_input_port(midi_buf_size));
+
     let mut seq_step: usize = 0;
     let seq_len: usize = 44100;
     let mut elapsed: f64 = 0.0;
     let mut prev_time = None;
 
     let callback = move |pa::stream::DuplexCallbackArgs { in_buffer, out_buffer, time, .. }| {
+        if let Ok(Some(midi_events)) = midi_in.read_n(midi_buf_size) {
+            let mut visit_order = graph.visit_order();
+            while let Some(node_ix) = visit_order.next(&graph) {
+                if let Some(ref mut dsp_node) = graph.node_mut(node_ix) {
+                    dsp_node.process_events(&midi_events);
+                }
+            }
+            
+        }
+                
         for &input_ix in &inputs {
             if let Some(&mut DspNode::Input(ref mut input_node)) = graph.node_mut(input_ix) {
                 let frames = in_buffer.chunks(in_channels).map(|frame| [frame[in_left], frame[in_right]]);
