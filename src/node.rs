@@ -1,55 +1,51 @@
 use dsp::{Node};
 
-use base::{Output, CHANNELS};
 use clip_cubic;
 use delay;
 use fm;
 use input;
 use sine;
 
-// TODO: DRY
-
-#[derive(Debug)]
-pub enum DspNode {
-    Blank,
-    Sine(sine::Sine),
-    Input(input::Input),
-    Delay(delay::Delay),
-    ClipCubic(clip_cubic::ClipCubic),
-    FmSynth(fm::FmSynth)
-}
-
-impl Node<[Output; CHANNELS]> for DspNode {
-    fn audio_requested(&mut self, buffer: &mut [[Output; CHANNELS]], sample_hz: f64) {
-        match *self {
-            DspNode::Blank => (),
-            DspNode::Sine(ref mut node) => node.audio_requested(buffer, sample_hz),
-            DspNode::Input(ref mut node) => node.audio_requested(buffer, sample_hz),
-            DspNode::Delay(ref mut node) => node.audio_requested(buffer, sample_hz),
-            DspNode::ClipCubic(ref mut node) => node.audio_requested(buffer, sample_hz),
-            DspNode::FmSynth(ref mut node) => node.audio_requested(buffer, sample_hz),
-        }        
-    }
-    
-    fn dry(&self) -> Output {
-        match *self {
-            DspNode::Blank => 0.0,
-            DspNode::Sine(ref node) => node.dry(),
-            DspNode::Input(ref node) => node.dry(),
-            DspNode::Delay(ref node) => node.dry(),
-            DspNode::ClipCubic(ref node) => node.dry(),
-            DspNode::FmSynth(ref node) => node.dry(),
+macro_rules! make_wrapper {
+    (
+        $name: ident,
+        $($typ: ty => $wrap: ident),*
+    ) => {
+        #[derive(Debug)]
+        pub enum $name {
+            Blank,
+            $($wrap($typ)),*
         }
-    }
-    
-    fn wet(&self) -> Output {
-        match *self {
-            DspNode::Blank => 1.0,
-            DspNode::Sine(ref node) => node.wet(),
-            DspNode::Input(ref node) => node.wet(),
-            DspNode::Delay(ref node) => node.wet(),
-            DspNode::ClipCubic(ref node) => node.wet(),
-            DspNode::FmSynth(ref node) => node.wet(),
+        
+        impl Node<[f32; 2]> for $name {
+            fn audio_requested(&mut self, buffer: &mut [[f32; 2]], sample_hz: f64) {
+                match *self {
+                    $name::Blank => (),
+                    $( $name::$wrap(ref mut node) => node.audio_requested(buffer, sample_hz) ),*
+                }
+            }
+            
+            fn dry(&self) -> f32 {
+                match *self {
+                    $name::Blank => 0.0,
+                    $( $name::$wrap(ref node) => node.dry() ),*
+                }
+            }
+            
+            fn wet(&self) -> f32 {
+                match *self {
+                    $name::Blank => 1.0,
+                    $( $name::$wrap(ref node) => node.wet() ),*
+                }
+            }
         }
     }
 }
+
+make_wrapper!(DspNode,
+    sine::Sine => Sine,
+    input::Input => Input,
+    delay::Delay => Delay,
+    clip_cubic::ClipCubic => ClipCubic,
+    fm::FmSynth => FmSynth
+);
