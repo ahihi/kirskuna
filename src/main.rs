@@ -62,7 +62,7 @@ fn get_command() -> Result<Command, Box<Error>> {
     opts.optopt("B", "midi-buf-size", "MIDI buffer size", "EVENTS");
     opts.optopt("l", "in-left", "left input channel", "CHANNEL");
     opts.optopt("r", "in-right", "right input channel", "CHANNEL");
-    opts.optopt("m", "midi-in", "MIDI input device index", "DEVICE");
+    //opts.optopt("m", "midi-in", "MIDI input device index", "DEVICE");
     opts.optopt("L", "out-left", "left output channel", "CHANNEL");
     opts.optopt("R", "out-right", "right output channel", "CHANNEL");
         
@@ -158,10 +158,9 @@ fn run(opts: &RunOptions) -> Result<(), Box<Error>> {
     inputs.push(input);*/
 
     let mut fm = FmSynth {
-        carrier: Operator::new(110.0, 0.5, AdEnvelope::new(128.0, 1.0)),
-        modulator: Operator::new(6.0 * 110.0, 1000.0, AdEnvelope::new(4.0, 1.5))
+        carrier: Operator::new(0.0, 0.5, AdEnvelope::new(128.0, 1.0)),
+        modulator: Operator::new(0.0, 1000.0, AdEnvelope::new(128.0, 4.0))
     };
-    fm.trigger();
     
     let (_, fm_synth) = graph.add_input(
         DspNode::FmSynth(fm),
@@ -173,8 +172,6 @@ fn run(opts: &RunOptions) -> Result<(), Box<Error>> {
     let midi = try!(PortMidi::new());
     let midi_in = try!(midi.default_input_port(midi_buf_size));
 
-    let mut seq_step: usize = 0;
-    let seq_len: usize = 44100;
     let mut elapsed: f64 = 0.0;
     let mut prev_time = None;
 
@@ -199,14 +196,6 @@ fn run(opts: &RunOptions) -> Result<(), Box<Error>> {
         let out_buffer: &mut [[Output; 2]] = out_buffer.to_frame_slice_mut().unwrap();
         slice::equilibrium(out_buffer);
         graph.audio_requested(out_buffer, SAMPLE_HZ);
-
-        let d_seq = out_buffer.len();
-        if seq_len - seq_step <= d_seq {
-            if let Some(&mut DspNode::FmSynth(ref mut synth)) = graph.node_mut(fm_synth) {
-                synth.trigger();                
-            }
-        }
-        seq_step = (seq_step + d_seq) % seq_len;
 
         let last_time = prev_time.unwrap_or(time.current);
         let dt = time.current - last_time;

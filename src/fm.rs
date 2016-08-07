@@ -93,6 +93,11 @@ impl Operator {
         self.sine.step(sample_hz);
         self.amp_env.step(sample_hz);
     }
+    
+    pub fn set_frequency(&mut self, frequency: f64) {
+        self.base_frequency = frequency;
+        self.sine.frequency = frequency;
+    }
 }
 
 #[derive(Debug)]
@@ -121,8 +126,25 @@ impl Node<[f32; 2]> for FmSynth {
     }
 }
 
+const SEMITONE: f64 = 1.0594630943592953; // 2^(1/12);
+
 impl MidiDestination for FmSynth {
     fn process_events(&mut self, events: &[MidiEvent]) {
         println!("{:?}", events);
+        for event in events {
+            let msg = event.message;
+            match msg.status {
+                0b1001_0000 /* Ch1 note on */   => {
+                    let a4 = 69;
+                    let rel_note = msg.data1 as i32 - a4;
+                    let base_freq = 440.0 * SEMITONE.powf(rel_note as f64);
+                    self.carrier.set_frequency(base_freq);
+                    self.modulator.set_frequency(3.0 * base_freq);
+                    self.trigger();
+                },
+                0b1000_0000 /* Ch1 note off */  => {},
+                _                               => {}
+            }
+        }
     }
 }
