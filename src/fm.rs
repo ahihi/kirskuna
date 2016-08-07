@@ -98,6 +98,11 @@ impl Operator {
         self.base_frequency = frequency;
         self.sine.frequency = frequency;
     }
+    
+    pub fn trigger(&mut self) {
+        self.sine.phase = 0.0;
+        self.amp_env.trigger();
+    }
 }
 
 #[derive(Debug)]
@@ -108,8 +113,8 @@ pub struct FmSynth {
 
 impl FmSynth {
     pub fn trigger(&mut self) {
-        self.carrier.amp_env.trigger();
-        self.modulator.amp_env.trigger();
+        self.carrier.trigger();
+        self.modulator.trigger();
     }
 }
 
@@ -128,6 +133,10 @@ impl Node<[f32; 2]> for FmSynth {
 
 const SEMITONE: f64 = 1.0594630943592953; // 2^(1/12);
 
+fn to_rate(midi_value: u8) -> f64 {
+    (midi_value as f64 / 127.0).powf(4.0) * 64.0
+}
+
 impl MidiDestination for FmSynth {
     fn process_events(&mut self, events: &[MidiEvent]) {
         println!("{:?}", events);
@@ -140,9 +149,17 @@ impl MidiDestination for FmSynth {
                     let base_freq = 440.0 * SEMITONE.powf(rel_note as f64);
                     self.carrier.set_frequency(base_freq);
                     self.modulator.set_frequency(3.0 * base_freq);
+                    self.modulator.sine.amplitude = msg.data2 as f32 / 127.0 * 1000.0;
                     self.trigger();
                 },
                 0b1000_0000 /* Ch1 note off */  => {},
+                0b1011_0000 /* Ch1 CC       */  => match msg.data1 {
+                    12  => { self.carrier.amp_env.attack = to_rate(msg.data2); },
+                    13  => { self.carrier.amp_env.decay = to_rate(msg.data2); },
+                    14  => { self.modulator.amp_env.attack = to_rate(msg.data2); },
+                    15  => { self.modulator.amp_env.decay = to_rate(msg.data2); },
+                    _   => {}
+                },
                 _                               => {}
             }
         }
