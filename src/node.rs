@@ -58,5 +58,6 @@ make_wrapper!(DspNode,
     input::Input => Input,
     delay::Delay => Delay,
     clip_cubic::ClipCubic => ClipCubic,
-    fm::FmSynth => FmSynth
+    fm::FmSynth => FmSynth,
+    fm::PolyFmSynth => PolyFmSynth
 );

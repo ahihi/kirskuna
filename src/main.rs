@@ -17,7 +17,7 @@ use portmidi::{PortMidi, InputPort};
 
 use kirskuna::base::{Output};
 use kirskuna::clip_cubic::{ClipCubic};
-use kirskuna::fm::{AdEnvelope, FmSynth, Operator};
+use kirskuna::fm::{AdEnvelope, FmSynth, Operator, PolyFmSynth};
 use kirskuna::delay::{Delay};
 use kirskuna::input::{Input};
 use kirskuna::midi::{MidiDestination};
@@ -157,13 +157,10 @@ fn run(opts: &RunOptions) -> Result<(), Box<Error>> {
     );
     inputs.push(input);*/
 
-    let mut fm = FmSynth {
-        carrier: Operator::new(0.0, 0.5, AdEnvelope::new(128.0, 1.0)),
-        modulator: Operator::new(0.0, 1000.0, AdEnvelope::new(128.0, 4.0))
-    };
+    let mut fm = PolyFmSynth::new(8);
     
     let (_, fm_synth) = graph.add_input(
-        DspNode::FmSynth(fm),
+        DspNode::PolyFmSynth(fm),
         master
     );
 

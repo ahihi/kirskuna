@@ -73,11 +73,11 @@ pub struct Operator {
 }
 
 impl Operator {
-    pub fn new(base_frequency: f64, amplitude: f32, amp_env: AdEnvelope) -> Operator {
+    pub fn new(amplitude: f32, amp_env: AdEnvelope) -> Operator {
         Operator {
-            base_frequency: base_frequency,
+            base_frequency: 0.0,
             sine: Sine {
-                frequency: base_frequency,
+                frequency: 0.0,
                 phase: 0.0,
                 amplitude: amplitude
             },
@@ -112,6 +112,13 @@ pub struct FmSynth {
 }
 
 impl FmSynth {
+    pub fn new() -> FmSynth {
+        FmSynth {
+            carrier: Operator::new(0.5, AdEnvelope::new(128.0, 1.0)),
+            modulator: Operator::new(1000.0, AdEnvelope::new(128.0, 4.0))
+        }
+    }
+    
     pub fn trigger(&mut self) {
         self.carrier.trigger();
         self.modulator.trigger();
@@ -119,14 +126,15 @@ impl FmSynth {
 }
 
 impl Node<[f32; 2]> for FmSynth {
-    fn audio_requested(&mut self, buffer: &mut [[f32; 2]], sample_hz: f64) {
-        slice::map_in_place(buffer, |_| {
+    fn audio_requested(&mut self, buffer: &mut [[f32; 2]], sample_hz: f64) {        
+        slice::map_in_place(buffer, |in_frame| {            
             let output = self.carrier.value();
             self.carrier.sine.frequency = self.carrier.base_frequency + self.modulator.value() as f64;
             self.carrier.step(sample_hz);
             self.modulator.step(sample_hz);
             
-            Frame::from_fn(|_| output)
+            let out_frame: [f32; 2] = Frame::from_fn(|_| output);
+            in_frame.zip_map(out_frame, |a, b| a + b)
         });
     }
 }
@@ -139,7 +147,7 @@ fn to_rate(midi_value: u8) -> f64 {
 
 impl MidiDestination for FmSynth {
     fn process_events(&mut self, events: &[MidiEvent]) {
-        println!("{:?}", events);
+        println!("FmSynth: {:?}", events);
         for event in events {
             let msg = event.message;
             match msg.status {
@@ -162,6 +170,56 @@ impl MidiDestination for FmSynth {
                 },
                 _                               => {}
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PolyFmSynth {
+    pub voices: Vec<FmSynth>,
+    pub voice_ix: usize
+}
+
+impl PolyFmSynth {
+    pub fn new(n_voices: usize) -> PolyFmSynth {
+        let mut voices = Vec::with_capacity(n_voices);
+        for _ in 0..n_voices {
+            voices.push(FmSynth::new());
+        }
+        
+        PolyFmSynth {
+            voices: voices,
+            voice_ix: 0
+        }
+    }
+}
+
+impl Node<[f32; 2]> for PolyFmSynth {
+    fn audio_requested(&mut self, buffer: &mut [[f32; 2]], sample_hz: f64) {
+        for voice in &mut self.voices {
+            voice.audio_requested(buffer, sample_hz);
+        }
+    }
+}
+
+impl MidiDestination for PolyFmSynth {
+    fn process_events(&mut self, events: &[MidiEvent]) {
+        println!("PolyFmSynth: {:?}", events);
+        for event in events {
+            let msg = event.message;
+            match msg.status {
+                0b1001_0000 /* Ch1 note on */   => {
+                    self.voices[self.voice_ix].process_events(&[*event]);
+                    self.voice_ix = (self.voice_ix + 1) % self.voices.len();
+                },
+                0b1000_0000 /* Ch1 note off */  => {},
+                _                               => {
+                    for voice in &mut self.voices {
+                        voice.process_events(&[*event]);
+                    }
+                }
+            }
+            
         }
     }
 }
