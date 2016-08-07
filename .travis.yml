@@ -3,4 +3,4 @@ rust:
   - 1.9.0
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -qq libportaudio-dev
+  - sudo apt-get install -qq libportaudio-dev libportmidi-dev
