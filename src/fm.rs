@@ -115,7 +115,7 @@ impl FmSynth {
     pub fn new() -> FmSynth {
         FmSynth {
             carrier: Operator::new(0.5, AdEnvelope::new(128.0, 1.0)),
-            modulator: Operator::new(1000.0, AdEnvelope::new(128.0, 4.0))
+            modulator: Operator::new(1000.0, AdEnvelope::new(128.0, 2.0))
         }
     }
     

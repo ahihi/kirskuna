@@ -1,5 +1,6 @@
 extern crate dsp;
 extern crate getopts;
+extern crate pcap;
 extern crate portaudio;
 extern crate portmidi;
 
@@ -8,12 +9,13 @@ extern crate kirskuna;
 use std::cmp;
 use std::env;
 use std::error::Error;
+use std::sync::mpsc::channel;
 
 use dsp::{slice, Graph, Node, NodeIndex};
 use dsp::sample::ToFrameSliceMut;
 use getopts::Options;
 use portaudio as pa;
-use portmidi::{PortMidi, InputPort};
+use portmidi::{PortMidi, InputPort, MidiEvent, MidiMessage};
 
 use kirskuna::base::{Output};
 use kirskuna::clip_cubic::{ClipCubic};
@@ -34,7 +36,9 @@ struct RunOptions {
     in_right: usize,
     out_channels: usize,
     out_left: usize,
-    out_right: usize
+    out_right: usize,
+    ping_interface: Option<String>,
+    ping_read_timeout: i32
 }
 
 enum Command {
@@ -65,7 +69,9 @@ fn get_command() -> Result<Command, Box<Error>> {
     //opts.optopt("m", "midi-in", "MIDI input device index", "DEVICE");
     opts.optopt("L", "out-left", "left output channel", "CHANNEL");
     opts.optopt("R", "out-right", "right output channel", "CHANNEL");
-        
+    opts.optopt("p", "ping-interface", "network interface on which to listen for pings", "INTERFACE");
+    opts.optopt("t", "ping-read-timeout", "pcap read timeout for listening to pings", "MILLISECONDS");
+    
     let args: Vec<String> = env::args().collect();
     
     let m = try!(opts.parse(&args));
@@ -108,6 +114,13 @@ fn get_command() -> Result<Command, Box<Error>> {
 
     let out_channels = cmp::max(out_left, out_right) + 1;
 
+    let ping_interface = m.opt_str("p");
+
+    let ping_read_timeout = match m.opt_str("t") {
+        Some(s) => try!(s.parse::<i32>()),
+        None    => 0
+    };
+
     Ok(Command::Run(RunOptions {
         buf_size: buf_size,
         midi_buf_size: midi_buf_size,
@@ -116,7 +129,9 @@ fn get_command() -> Result<Command, Box<Error>> {
         in_right: in_right,
         out_channels: out_channels,
         out_left: out_left,
-        out_right: out_right
+        out_right: out_right,
+        ping_interface: ping_interface,
+        ping_read_timeout: ping_read_timeout
     }))
 }
 
@@ -129,6 +144,8 @@ fn run(opts: &RunOptions) -> Result<(), Box<Error>> {
     let out_left = opts.out_left;
     let out_right = opts.out_right;
     let out_channels = opts.out_channels;
+    let ref ping_interface = opts.ping_interface;
+    let ping_read_timeout = opts.ping_read_timeout;
     
     let mut graph = Graph::new();
 
@@ -169,10 +186,61 @@ fn run(opts: &RunOptions) -> Result<(), Box<Error>> {
     let midi = try!(PortMidi::new());
     let midi_in = try!(midi.default_input_port(midi_buf_size));
 
+    let mut cap_opt = match *ping_interface {
+        Some(ref iface) => {
+            let mut cap = try!(try!(pcap::Capture::from_device(&iface[..])).timeout(ping_read_timeout).open());
+            try!(cap.filter("icmp[icmptype] = icmp-echo"));
+            Some(cap)
+        },
+        None => None
+    };
+    
+    let (tx, rx) = channel();
+    let ping_seq = vec![
+        Some((41, 100)),
+        Some((48, 100)),
+        Some((53, 100)),
+        Some((55, 100)),
+        Some((57, 100)),
+        Some((55, 100)),
+        Some((53, 100)),
+        Some((48, 100)),
+        Some((50, 100)),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some((36, 100))
+    ];
+    let mut ping_ix = 0;
+    
     let mut elapsed: f64 = 0.0;
     let mut prev_time = None;
 
     let callback = move |pa::stream::DuplexCallbackArgs { in_buffer, out_buffer, time, .. }| {
+        while let Ok(()) = rx.try_recv() {
+            if let Some((note, vel)) = ping_seq[ping_ix] {            
+                let midi_event = MidiEvent {
+                    message: MidiMessage {
+                        status: 0b1001_0000, // Note on
+                        data1: note,
+                        data2: vel
+                    },
+                    timestamp: 0
+                };
+                let mut visit_order = graph.visit_order();
+                while let Some(node_ix) = visit_order.next(&graph) {
+                    if let Some(ref mut dsp_node) = graph.node_mut(node_ix) {
+                        dsp_node.process_events(&[midi_event]);
+                    }
+                }                
+            }
+            
+            ping_ix = (ping_ix + 1) % ping_seq.len();
+        }
+        
         if let Ok(Some(midi_events)) = midi_in.read_n(midi_buf_size) {
             let mut visit_order = graph.visit_order();
             while let Some(node_ix) = visit_order.next(&graph) {
@@ -180,7 +248,6 @@ fn run(opts: &RunOptions) -> Result<(), Box<Error>> {
                     dsp_node.process_events(&midi_events);
                 }
             }
-            
         }
                 
         for &input_ix in &inputs {
@@ -210,7 +277,14 @@ fn run(opts: &RunOptions) -> Result<(), Box<Error>> {
     try!(stream.start());
 
     while let true = try!(stream.is_active()) {
-        ::std::thread::sleep(::std::time::Duration::from_millis(16));
+        if let Some(ref mut cap) = cap_opt {
+            if let Ok(_ping) = cap.next() {
+                println!("PING");
+                try!(tx.send(()));
+            }
+        }
+        
+        //::std::thread::sleep(::std::time::Duration::from_millis(16));
     }
 
     Ok(())

@@ -15,4 +15,5 @@ path = "src/main.rs"
 getopts = "0.2"
 dsp-chain = "0.13.*"
 portaudio = "0.6.*"
+pcap = "0.5"
 portmidi = { git = "https://github.com/ahihi/portmidi-rs.git" }
